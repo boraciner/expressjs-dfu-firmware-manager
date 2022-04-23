@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title><%= pageTitle %></title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/product.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <script src="https://kit.fontawesome.com/ee6ade3482.js" crossorigin="anonymous"></script>
+    <%- include('includes/main-style.ejs') %>
+</head>
+
+<body>
+    <%- include('includes/navigation.ejs') %>
+
+    <main>
+          
+      <div id="mainCoantiner">
+        <!--dust particel-->
+        <div class="margin-body">
+
+            <div>
+                <div class="starsec"></div>
+                <div class="starthird"></div>
+                <div class="starfourth"></div>
+                <div class="starfifth"></div>
+            </div>
+            <!--Dust particle end--->
+
+            <div class="row">
+                <div class="col-sm-12 col-md-12">
+                    <div class="wpb_text_column wpb_content_element ">
+                        <div class="wpb_wrapper">
+                            <div class="title-h1 text-center"><span><span class="light"> Project Name: <%= firmware.projectName %> </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+      
+          <div class="container-fluid ">
+            <div class="row justify-content-start">
+              <div class="col-12">
+                <h5>Version: <%= firmware.version %></h2>
+                <h5>Details: <%= firmware.details %></h2>
+                
+              </div>
+            </div>
+            <div class="row justify-content-center" style="margin-top: 50px;">
+              <div class="col-12">
+                <button type="button" id="connectButton" class="btn btn-success btn-sm fade-in">
+                  <i class="fab fa-usb"></i>
+                  Download to Device
+                </button>
+                <div class="d-none" id="transferredOfString" style="width:100%">
+                    Transferred <span id="sentBytes"></span> of <span id="totalBytes"></span>
+                </div>        
+                <div class="d-none" id="transferCompletedString">
+                  Transfer Completed!
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+        
+
+    </main>
+
+    <script type='text/javascript'>
+
+        let fw = <%- firmwareContent%>
+        console.log("firmware content" , fw)
+
+        let bytes = new Uint8Array(fw)
+        console.log("firmware content Uint8Array" , bytes)
+
+
+
+
+
+
+
+
+        class ApplicationUpdater{
+
+constructor(deviceVar){
+  this.device = deviceVar;
+
+}
+
+async readInformationBlock(){
+  let blockCounter = 0;
+  let responseLength = 0;
+  let result = await this.device.controlTransferIn({
+        requestType: 'class',
+        recipient: 'interface',
+        request: 2,
+        value: 9,
+        index: 0}, 128);
+    console.log("RESULT :",result.data);
+    let data = new Uint8Array(result.data.buffer);
+    console.log("data :",data);
+    
+    
+    let pInfo_magic = data.slice(0,2);
+    let pInfo_revSignature = data.slice(2,4);
+    let pInfo_man = data.slice(4,6);
+    let pInfo_hwId = data.slice(6,7);
+    let pInfo_hwSubId = data.slice(7,8);
+    let pInfo_revMajor = data.slice(8,9);
+    let pInfo_revMinor = data.slice(9,10);
+    let pInfo_features = data.slice(10,14);
+    let pInfo_serial = data.slice(14,18);
+    let pInfo_year = data.slice(18,20);
+    let pInfo_month = data.slice(20,21);
+    let pInfo_day = data.slice(21,22);
+    let pInfo_customText = (new TextDecoder("utf-8").decode(data.slice(22,22+64))).replace(/[^a-z0-9]/gmi, " ").replace(/\s+/g, " ").trim();
+    pInfo_man = ""+pInfo_man[1]+"."+pInfo_man[0]
+    let year = pInfo_year[0] | (pInfo_year[1] << 8)
+    let magic = pInfo_magic[0] | (pInfo_magic[1] << 8)
+
+    productInformation = new ProductInformationBlock(
+      magic,
+      "0x"+buf2hex(pInfo_revSignature),
+      pInfo_man,
+      pInfo_hwId,
+      pInfo_hwSubId,
+      pInfo_revMajor+"."+pInfo_revMinor,
+      "0x"+buf2hex(pInfo_features),
+      "0x"+buf2hex(pInfo_serial),
+      year,
+      pInfo_month[0],
+      pInfo_day[0],
+      pInfo_customText
+    )
+
+    console.log("PRODUCT INFORMATION : ",productInformation)
+
+    FillProductInformationTable(productInformation);
+}
+
+
+
+Update(myByteArray,blockCounter = 0,askForStatus = false){
+
+  console.log(">>>>Application Updater | Update | blockCounter",blockCounter,"askForStatus", askForStatus)
+
+  if(askForStatus){
+    console.log("askForStatus true....")
+
+    let result2 = this.device.controlTransferIn({
+      requestType: 'class',
+      recipient: 'interface',
+      request: 3,
+      value: 0,
+      index: 0}, 6);
+    result2.then(res2=>{
+      console.log("RESULT Status of Device ",res2)
+      let arrayBuffer = res2.data.buffer;
+      let receivedData = new Uint8Array(arrayBuffer);
+      console.log(">>> Status ")
+      if (receivedData[4] === 0x04 || receivedData[4] === 0x05) {
+        console.log(">>> Status stage 1")
+        if (receivedData[4] === 0x04)
+        {
+          console.log(">>> Status stage 2")
+          let timeout = ((receivedData[2] & 0xff) << 8) | (receivedData[1] & 0xff);
+          setTimeout(() => {
+            console.error("wait for ",timeout," milliseconds")
+            this.Update(myByteArray,blockCounter,true)
+          }, timeout);
+        }else{
+          console.log(">>> Status stage 3")
+          console.error("do it now...")
+          this.Update(myByteArray,blockCounter,false)
+        }
+        
+      }else{
+        console.error("There is a problem");
+      }
+    }) 
+
+
+  }else{
+    console.log("askForStatus false....")
+    let myCurrentByteIndex = blockCounter*512;
+    let availableNextBytes = 0
+    if(myCurrentByteIndex > myByteArray.length){
+      console.warn("askForStatus false.... myByteArray.length",myByteArray.length,"myCurrentByteIndex",myCurrentByteIndex," You must handle this")
+      availableNextBytes = 0;
+    }else if(myByteArray.length >= myCurrentByteIndex+512)
+      availableNextBytes = myCurrentByteIndex+512
+    else
+      availableNextBytes = myByteArray.length; 
+
+    console.log("myCurrentByteIndex",myCurrentByteIndex,"availableNextBytes",availableNextBytes,"total length",myByteArray.length)
+    document.getElementById("sentBytes").innerText = myCurrentByteIndex
+    document.getElementById("totalBytes").innerText = myByteArray.length
+    
+    if(availableNextBytes > 0)
+    {
+      console.log("Write IT ===> FROM ",myCurrentByteIndex, "TO",availableNextBytes);
+
+      let result = this.device.controlTransferOut({
+      requestType: 'class',
+      recipient: 'interface',
+      request: 1,
+      value: blockCounter,
+      index: 0}, myByteArray.slice(myCurrentByteIndex,availableNextBytes));
+    
+    
+      result.then(res=>{
+        blockCounter += 1
+      
+        console.log("RESULT writing BULK ",res)
+        if(true){
+          let result2 = this.device.controlTransferIn({
+            requestType: 'class',
+            recipient: 'interface',
+            request: 3,
+            value: 0,
+            index: 0}, 6);
+          result2.then(res2=>{
+            console.log("RESULT Status of Device ",res2)
+            let arrayBuffer = res2.data.buffer;
+            let receivedData = new Uint8Array(arrayBuffer);
+            console.log(">>> Status ")
+            if (receivedData[4] === 0x04 || receivedData[4] === 0x05) {
+              console.log(">>> Status stage 1")
+              if (receivedData[4] === 0x04)
+              {
+                console.log(">>> Status stage 2")
+                let timeout = ((receivedData[2] & 0xff) << 8) | (receivedData[1] & 0xff);
+                setTimeout(() => {
+                  console.log("wait for ",timeout," milliseconds")
+                  this.Update(myByteArray,blockCounter,true)
+                }, timeout);
+              }else{
+                console.log(">>> Status stage 3")
+                console.log("do it now...")
+                this.Update(myByteArray,blockCounter,false)
+              }
+              
+            }else{
+              console.error("Something is wrong");
+            }
+          }) 
+        }
+      })
+
+    }else{
+      // Final Stage After finishing Application Firmware
+      console.log("Finishing Application Firmware Upload - 1")
+      let result = this.device.controlTransferOut({
+      requestType: 'class',
+      recipient: 'interface',
+      request: 1,
+      value: blockCounter,
+      index: 0}, new Uint8Array());
+      result.then(res=>{
+        console.log("Finishing Application Firmware Upload - 2")
+        let result2 = this.device.controlTransferIn({
+            requestType: 'class',
+            recipient: 'interface',
+            request: 3,
+            value: 0,
+            index: 0}, 6);
+          result2.then(res2=>{
+            console.log("Finishing Application Firmware Upload - 3")
+            let result3 = this.device.controlTransferIn({
+              requestType: 'class',
+              recipient: 'interface',
+              request: 3,
+              value: 0,
+              index: 0}, 6);
+            });
+            document.querySelector("#transferredOfString").classList.add("d-none") 
+            
+            document.querySelector("#transferCompletedString").classList.remove("d-none") 
+      });
+    }
+  }
+}
+};
+
+
+
+
+
+        let connectButtonElement = document.querySelector("#connectButton");
+
+
+        connectButtonElement.addEventListener("click",async function(event){
+          try {
+            device = await navigator.usb.requestDevice({ filters: [{
+                vendorId: 2492
+            }]});
+          } catch (err) {
+              device = undefined;
+          }
+         
+          if (device !== undefined) {
+              await device.open();
+              if (device.configuration === null)
+              {
+                  console.log("device.configuration === null");
+                  await device.selectConfiguration(0);
+              }else{
+                  console.log("device.configuration != null");
+              }
+              await device.claimInterface(0);
+
+              applicationUpdater = new ApplicationUpdater(device);
+
+              document.querySelector("#transferredOfString").classList.remove("d-none")
+              document.querySelector("#connectButton").classList.add("d-none") 
+              applicationUpdater.Update(bytes)
+              ConnectProcessUI();
+          }
+      });
+
+
+
+
+
+
+
+
+
+
+
+
+
+    </script>
+</body>
+
+</html>

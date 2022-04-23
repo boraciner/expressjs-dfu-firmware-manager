@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title><%= pageTitle %></title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/forms.css">
+    <link rel="stylesheet" href="/css/product.css">
+</head>
+
+<body>
+   <%- include('includes/navigation.ejs') %>
+
+    <main>
+        <form ref='uploadForm' id='uploadForm'  action="/admin/add-firmware" method='post' encType="multipart/form-data">
+        <div>
+            <div>
+                <label for="projectName">Project Name</label>
+                <input type="text" name="projectName" id="projectName">
+            </div>
+            <div>
+                <label for="version">Version</label>
+                <input type="text" name="version" id="version">
+            </div>
+            <div>
+                <label for="details">Details</label>
+                <input type="text" name="details" id="details">
+            </div>
+            <div>
+                <input type="file" name="sampleFile" />
+            </div>
+            <div>    
+                <button class="btn" type="submit">Add Firmware</button>
+            </div>
+        </div>
+    </form>  
+    </main>
+</body>
+
+</html>
